@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Ponto NFC Local com Exportação</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
+        .container { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
+        h1 { color: #007bff; text-align: center; margin-bottom: 20px; }
+        #scanButton { padding: 15px 30px; font-size: 1.2em; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 8px; transition: background-color 0.3s; width: 100%; box-sizing: border-box; }
+        #scanButton:hover { background-color: #0056b3; }
+        #status { margin-top: 20px; padding: 15px; border: 2px solid #ccc; border-radius: 8px; font-weight: bold; text-align: center; transition: border-color 0.3s; }
+        .action-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .action-buttons button { flex: 1; padding: 10px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; }
+        #exportButton { background-color: #28a745; color: white; }
+        #exportButton:hover { background-color: #1e7e34; }
+        #log { margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; }
+        .log-entry { border-bottom: 1px dashed #ced4da; padding: 8px 0; }
+        .warning { color: #dc3545; font-size: 0.9em; margin-top: 15px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🕒 Registro de Ponto NFC</h1>
+        <p>Clique abaixo, **aproxime o crachá** e o ponto será registrado neste dispositivo. Lembre-se de anotar o ID do seu crachá!</p>
+        
+        <button id="scanButton">Iniciar Leitura NFC</button>
+        
+        <div id="status">Aguardando...</div>
+        
+        <div class="action-buttons">
+            <button onclick="displayLocalPunches()">Atualizar Log Local</button>
+            <button id="exportButton" onclick="exportPunchesToCSV()">⬇️ Exportar Pontos (CSV)</button>
+        </div>
+
+        <h2>Log de Pontos (Últimos Registros)</h2>
+        <div id="log">Nenhum registro ainda.</div>
+        
+        <p class="warning">⚠️ Os dados são salvos apenas neste dispositivo. **Exporte o CSV** regularmente para não perder os registros.</p>
+    </div>
+
+    <script>
+        // =======================================================
+        // 🚨 1. LISTA DE IDS NFC VÁLIDOS E NOMES ASSOCIADOS 🚨
+        // *******************************************************
+        // ➡️ SUBSTITUA 'ID_CRACHA_TESTE' pelo ID real que seu crachá retornar 
+        //    após o primeiro teste (mensagem de erro vermelha)
+        // *******************************************************
+        const COLLABORATOR_MAP = {
+            '74:e6:dd:f0': 'GUSTAVO (TESTE)', 
+            'ID_CRACHA_01': 'João da Silva',
+            'ID_CRACHA_02': 'Maria Oliveira',
+            'ID_CRACHA_03': 'Pedro Santos',
+            'ID_CRACHA_04': 'Ana Souza',
+            'ID_CRACHA_05': 'Carlos Lima',
+            'ID_CRACHA_06': 'Laura Mendes',
+            'ID_CRACHA_07': 'Rafael Costa',
+            'ID_CRACHA_08': 'Bianca Almeida',
+            'ID_CRACHA_09': 'Felipe Rocha'
+        };
+        const VALID_NFC_IDS = Object.keys(COLLABORATOR_MAP);
+        // =======================================================
+
+        document.getElementById('scanButton').addEventListener('click', startNFCScan);
+
+        function getCollaboratorName(id) {
+            return COLLABORATOR_MAP[id] || `Colaborador Desconhecido (${id})`;
+        }
+
+        // --- Funções de Interface (Log) ---
+        function logStatus(message, isError = false) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.style.color = isError ? '#dc3545' : '#28a745';
+            statusElement.style.borderColor = isError ? '#dc3545' : '#28a745';
+            
+            const logElement = document.getElementById('log');
+            const time = new Date().toLocaleTimeString('pt-BR');
+            const entry = document.createElement('p');
+            entry.className = 'log-entry';
+            entry.style.color = isError ? '#dc3545' : 'black';
+            entry.innerHTML = `**[${time}]** ${message}`;
+            logElement.prepend(entry);
+            if (logElement.children.length > 10) logElement.removeChild(logElement.lastElementChild);
+        }
+        
+        // --- Função de Armazenamento Local ---
+        function savePunchLocally(colaboradorId) {
+            const now = new Date();
+            const record = {
+                id: colaboradorId,
+                nome: getCollaboratorName(colaboradorId),
+                timestamp: now.toISOString(),
+                horaLocal: now.toLocaleString('pt-BR')
+            };
+
+            const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
+            let records = JSON.parse(existingRecordsJSON);
+            records.push(record);
+            localStorage.setItem('pontosRegistrados', JSON.stringify(records));
+            
+            logStatus(`✅ Ponto registrado localmente! ${record.nome} (${colaboradorId})`);
+            displayLocalPunches();
+        }
+
+        // --- Função de Leitura NFC ---
+        async function startNFCScan() {
+            logStatus("Iniciando leitura... Aproxime o crachá.");
+            
+            if ('NDEFReader' in window) {
+                try {
+                    const ndef = new NDEFReader();
+                    await ndef.scan();
+                    logStatus("Leitura iniciada. Aguardando crachá (Tag NDEF)...");
+
+                    ndef.onreading = (event) => {
+                        let colaboradorNFC_ID = event.serialNumber || 'SEM_SERIAL'; 
+                        
+                        // Tenta ler o conteúdo NDEF (se gravado como texto)
+                        const records = event.message.records;
+                        if (records.length > 0) {
+                            const textRecord = records.find(r => r.recordType === 'text');
+                            if (textRecord) {
+                                const decoder = new TextDecoder(textRecord.encoding);
+                                colaboradorNFC_ID = decoder.decode(textRecord.data);
+                            }
+                        }
+
+                        // Verifica se o ID lido está na lista de IDs válidos
+                        if (VALID_NFC_IDS.includes(colaboradorNFC_ID)) {
+                            savePunchLocally(colaboradorNFC_ID);
+                        } else {
+                            // Mensagem para ajudar a descobrir o ID no primeiro teste
+                            logStatus(`🛑 Crachá não reconhecido! ID lido: ${colaboradorNFC_ID}. Anote e adicione no código.`, true);
+                        }
+                    };
+
+                    ndef.onreadingerror = (error) => {
+                        logStatus("Erro ao ler o crachá. Tente novamente ou verifique o tipo de tag.", true);
+                    };
+
+                } catch (error) {
+                    logStatus(`Erro ao iniciar o scanner: ${error.name}. Verifique a permissão NFC e se o Chrome/Android está em uso.`, true);
+                }
+            } else {
+                logStatus("❌ Web NFC API não é suportada neste navegador.", true);
+            }
+        }
+        
+        // --- Função para Exibir Pontos Salvos ---
+        function displayLocalPunches() {
+            const logElement = document.getElementById('log');
+            const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
+            const records = JSON.parse(existingRecordsJSON);
+            
+            logElement.innerHTML = ''; 
+            
+            if (records.length === 0) {
+                logElement.innerHTML = '<p>Nenhum ponto salvo localmente ainda.</p>';
+                return;
+            }
+            
+            records.reverse().forEach(record => {
+                const entry = document.createElement('p');
+                entry.className = 'log-entry';
+                entry.style.color = 'black';
+                entry.innerHTML = `**[${record.horaLocal}]** - ${record.nome} (${record.id})`;
+                logElement.appendChild(entry);
+            });
+        }
+        
+        // --- Função de Exportação CSV ---
+        function exportPunchesToCSV() {
+            const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
+            const records = JSON.parse(existingRecordsJSON);
+
+            if (records.length === 0) {
+                alert("Não há pontos registrados para exportar.");
+                return;
+            }
+
+            const header = "ID_Cracha;Nome_Colaborador;Data_Completa_ISO;Hora_Local\n";
+            
+            const csvRows = records.map(record => {
+                const sanitizedName = record.nome.replace(/;/g, ','); 
+                return `${record.id};${sanitizedName};${record.timestamp};${record.horaLocal}`;
+            });
+
+            const csvContent = header + csvRows.join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            a.setAttribute('href', url);
+            
+            const now = new Date();
+            const filename = `relatorio_ponto_${now.getFullYear()}${now.getMonth()+1}${now.getDate()}_${now.getHours()}${now.getMinutes()}.csv`;
+            
+            a.setAttribute('download', filename);
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            logStatus(`🎉 Exportação concluída! Arquivo ${filename} baixado.`);
+        }
+        
+        // Carrega o log ao iniciar
+        document.addEventListener('DOMContentLoaded', displayLocalPunches);
+    </script>
+</body>
+</html>
