@@ -19,9 +19,9 @@
             padding: 15px;
             border: 1px dashed #ced4da;
             border-radius: 8px;
-            background-color: #f0f8ff; /* Fundo mais claro para destaque */
+            background-color: #f0f8ff;
         }
-        #manualNameInput { /* ID do campo alterado para refletir o Nome */
+        #manualNameInput {
             flex-grow: 1;
             padding: 10px;
             border: 1px solid #ccc;
@@ -30,7 +30,7 @@
         }
         #manualPunchButton {
             padding: 10px 15px;
-            background-color: #ffc107; /* Amarelo para alerta/ação alternativa */
+            background-color: #ffc107;
             color: black;
             border: none;
             border-radius: 5px;
@@ -48,7 +48,6 @@
         .log-entry { border-bottom: 1px dashed #ced4da; padding: 8px 0; }
         .warning { color: #dc3545; font-size: 0.9em; margin-top: 15px; text-align: center; }
 
-        /* Estilo do botão administrativo no rodapé */
         .admin-footer-action {
             max-width: 700px;
             margin: 50px auto 20px auto; 
@@ -76,7 +75,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>🕒 Registro de Ponto NFC</h1>
+        <h1>🕒 Registro de Ponto NFC MR01</h1>
+        
         <p>Clique abaixo, **aproxime o crachá** e o ponto será registrado neste dispositivo.</p>
         
         <button id="scanButton">Iniciar Leitura NFC</button>
@@ -103,11 +103,12 @@
         <button id="clearButton" onclick="clearPunches()">⚠️ Limpeza Administrativa de Pontos (CUIDADO)</button>
     </div>
     <script>
+        // Inicializa o contexto de áudio apenas uma vez
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = AudioContext ? new AudioContext() : null;
+        
         // =======================================================
         // 🚨 1. LISTA DE IDS NFC VÁLIDOS E NOMES ASSOCIADOS 🚨
-        // *******************************************************
-        // ATENÇÃO: Os nomes devem ser únicos e corresponder EXATAMENTE ao que o funcionário digitará.
-        // *******************************************************
         const COLLABORATOR_MAP = {
             '74:e6:dd:f0': 'GUSTAVO (TESTE)', 
             'a1:43:4a:6a': 'Hugo',
@@ -130,9 +131,7 @@
             return COLLABORATOR_MAP[id] || `Colaborador Desconhecido (${id})`;
         }
         
-        // --- FUNÇÃO AUXILIAR PARA ENCONTRAR O ID PELO NOME ---
         function getIdByCollaboratorName(name) {
-            // Converte o nome digitado e todos os nomes do mapa para minúsculas e remove espaços extras para facilitar a correspondência
             const normalizedName = name.trim().toUpperCase();
             
             for (const id in COLLABORATOR_MAP) {
@@ -140,12 +139,67 @@
                     return id;
                 }
             }
-            return null; // Retorna null se o nome não for encontrado
+            return null;
         }
-        // ------------------------------------------------------
+        
+        // --- FUNÇÃO PARA GERAR SOM DE SUCESSO (Bip agudo) ---
+        function playSuccessSound() {
+            if (!audioCtx) return;
+
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.type = 'sine';
+                
+                // Tom alto para sucesso (880 Hz)
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
+                
+                // Volume e duração (0.1 segundo)
+                gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); 
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+                
+            } catch (e) {
+                console.error("Erro ao gerar áudio de sucesso.", e);
+            }
+        }
+        
+        // --- FUNÇÃO PARA GERAR SOM DE ERRO (Tom grave e decrescente) ---
+        function playErrorSound() {
+            if (!audioCtx) return;
+            
+            try {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                oscillator.type = 'triangle'; // Onda triangular
+                
+                // Frequência: começa em 440Hz e cai para 300Hz (tom de "falha")
+                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); 
+                oscillator.frequency.linearRampToValueAtTime(300, audioCtx.currentTime + 0.2);
+                
+                // Volume e duração (0.2 segundos)
+                gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2); 
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.2);
+            } catch (e) {
+                console.error("Erro ao gerar áudio de erro.", e);
+            }
+        }
+        // --- FIM FUNÇÕES DE ÁUDIO GERADO ---
 
 
-        // --- Funções de Interface (Log) ---
         function logStatus(message, isError = false) {
             const statusElement = document.getElementById('status');
             statusElement.textContent = message;
@@ -162,7 +216,6 @@
             if (logElement.children.length > 10) logElement.removeChild(logElement.lastElementChild);
         }
         
-        // --- Função de Armazenamento Local ---
         function savePunchLocally(colaboradorId) {
             const now = new Date();
             const record = {
@@ -177,33 +230,35 @@
             records.push(record);
             localStorage.setItem('pontosRegistrados', JSON.stringify(records));
             
+            // SUCESSO DE PONTO
+            playSuccessSound();
+
             logStatus(`✅ Ponto registrado localmente! ${record.nome} (${colaboradorId})`);
             displayLocalPunches();
         }
 
-        // --- NOVA FUNÇÃO: Registro Manual por Nome ---
         function manualPunch() {
             const inputElement = document.getElementById('manualNameInput');
             const colaboradorNome = inputElement.value.trim();
             
             if (!colaboradorNome) {
                 logStatus("🛑 Por favor, digite seu nome completo.", true);
+                playErrorSound(); // ERRO
                 return;
             }
 
             const colaboradorId = getIdByCollaboratorName(colaboradorNome);
 
-            // Verifica se o ID foi encontrado (se o nome existe no mapa)
             if (colaboradorId) {
+                // Sucesso: Chama savePunchLocally, que toca o áudio de sucesso.
                 savePunchLocally(colaboradorId);
-                inputElement.value = ''; // Limpa o campo após o sucesso
+                inputElement.value = '';
             } else {
                 logStatus(`🛑 Nome '${colaboradorNome}' não reconhecido. Por favor, digite exatamente como está cadastrado.`, true);
+                playErrorSound(); // ERRO
             }
         }
-        // --- FIM NOVA FUNÇÃO ---
 
-        // --- Função de Leitura NFC (Mantida) ---
         async function startNFCScan() {
             logStatus("Iniciando leitura... Aproxime o crachá.");
             
@@ -216,7 +271,6 @@
                     ndef.onreading = (event) => {
                         let colaboradorNFC_ID = event.serialNumber || 'SEM_SERIAL'; 
                         
-                        // Tenta ler o conteúdo NDEF (se gravado como texto)
                         const records = event.message.records;
                         if (records.length > 0) {
                             const textRecord = records.find(r => r.recordType === 'text');
@@ -226,20 +280,23 @@
                             }
                         }
 
-                        // Verifica se o ID lido está na lista de IDs válidos
                         if (VALID_NFC_IDS.includes(colaboradorNFC_ID)) {
+                            // Sucesso: Chama savePunchLocally, que toca o áudio de sucesso.
                             savePunchLocally(colaboradorNFC_ID);
                         } else {
-                            // Mensagem para ajudar a descobrir o ID no primeiro teste
+                            // Falha: Toca som de erro e registra status
+                            playErrorSound();
                             logStatus(`🛑 Crachá não reconhecido! ID lido: ${colaboradorNFC_ID}. Anote e adicione no código.`, true);
                         }
                     };
 
                     ndef.onreadingerror = (error) => {
+                        playErrorSound(); // ERRO
                         logStatus("Erro ao ler o crachá. Tente novamente ou verifique o tipo de tag.", true);
                     };
 
                 } catch (error) {
+                    playErrorSound(); // ERRO
                     logStatus(`Erro ao iniciar o scanner: ${error.name}. Verifique a permissão NFC e se o Chrome/Android está em uso.`, true);
                 }
             } else {
@@ -247,7 +304,6 @@
             }
         }
         
-        // --- Função para Exibir Pontos Salvos (Mantida) ---
         function displayLocalPunches() {
             const logElement = document.getElementById('log');
             const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
@@ -269,7 +325,6 @@
             });
         }
         
-        // --- Função para Limpar Pontos Salvos (Mantida) ---
         function clearPunches() {
             if (confirm("ATENÇÃO: Você tem certeza que deseja limpar TODOS os registros de ponto salvos NESTE dispositivo? ESTA AÇÃO É IRREVERSÍVEL. Certifique-se de ter exportado o CSV antes.")) {
                 localStorage.removeItem('pontosRegistrados');
@@ -280,7 +335,6 @@
             }
         }
         
-        // --- Função de Exportação CSV (Mantida) ---
         function exportPunchesToCSV() {
             const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
             const records = JSON.parse(existingRecordsJSON);
@@ -317,9 +371,7 @@
             logStatus(`🎉 Exportação concluída! Arquivo ${filename} baixado.`);
         }
         
-        // Carrega o log ao iniciar
         document.addEventListener('DOMContentLoaded', displayLocalPunches);
     </script>
 </body>
 </html>
-
