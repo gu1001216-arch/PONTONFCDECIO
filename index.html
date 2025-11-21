@@ -103,6 +103,66 @@
         <button id="clearButton" onclick="clearPunches()">⚠️ Limpeza Administrativa de Pontos (CUIDADO)</button>
     </div>
     <script>
+        // =======================================================
+        // 🚀 INÍCIO DO WAKE LOCK API (Bloqueio de Tela) 🚀
+        // =======================================================
+        let wakeLock = null;
+
+        /**
+         * Tenta solicitar o bloqueio da tela.
+         * Deve ser chamada após uma interação do usuário.
+         */
+        const requestWakeLock = async () => {
+            if (wakeLock !== null) return; // Já está ativo
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('✅ Screen Wake Lock Ativo! Tela não apagará.');
+
+                    // Adiciona um listener para reativar o bloqueio se for liberado automaticamente
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Bloqueio de tela liberado pelo sistema.');
+                        wakeLock = null; // Zera a referência
+                    });
+                } catch (err) {
+                    console.error(`❌ Erro ao solicitar Wake Lock: ${err.name}, ${err.message}`);
+                    wakeLock = null; // Garante que a referência está nula em caso de falha
+                }
+            } else {
+                console.log('❌ O navegador não suporta a Screen Wake Lock API.');
+            }
+        };
+
+        /**
+         * Tenta liberar o bloqueio da tela.
+         */
+        const releaseWakeLock = async () => {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+                console.log('Bloqueio de tela liberado manualmente.');
+            }
+        };
+
+        /**
+         * Lida com a visibilidade da página para tentar reativar o bloqueio ao voltar
+         */
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+            } else {
+                // Ao ir para segundo plano, o navegador pode liberar o lock.
+                // Não é estritamente necessário liberar manualmente aqui.
+            }
+        };
+
+        // Adiciona o listener de visibilidade para reativar o lock quando o usuário volta para a aba
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // =======================================================
+        // 🛑 FIM DO WAKE LOCK API 🛑
+        // =======================================================
+
         // Inicializa o contexto de áudio apenas uma vez
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = AudioContext ? new AudioContext() : null;
@@ -125,7 +185,11 @@
         const VALID_NFC_IDS = Object.keys(COLLABORATOR_MAP);
         // =======================================================
 
-        document.getElementById('scanButton').addEventListener('click', startNFCScan);
+        // Adiciona a chamada de Wake Lock ao botão principal
+        document.getElementById('scanButton').addEventListener('click', () => {
+            requestWakeLock(); // Tenta garantir que a tela não apague ao iniciar o NFC
+            startNFCScan();
+        });
 
         function getCollaboratorName(id) {
             return COLLABORATOR_MAP[id] || `Colaborador Desconhecido (${id})`;
@@ -371,7 +435,11 @@
             logStatus(`🎉 Exportação concluída! Arquivo ${filename} baixado.`);
         }
         
-        document.addEventListener('DOMContentLoaded', displayLocalPunches);
+        // Inicializações
+        document.addEventListener('DOMContentLoaded', () => {
+             displayLocalPunches();
+             requestWakeLock(); // Tenta ativar o Wake Lock assim que a página carrega
+        });
     </script>
 </body>
 </html>
