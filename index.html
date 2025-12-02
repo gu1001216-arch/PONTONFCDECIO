@@ -3,172 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Ponto NFC Local com Exportação</title>
+    <title>Registro de Ponto NFC + Admin</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f9; }
-        .container { max-width: 700px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 6px 12px rgba(0,0,0,0.15); }
-        h1 { color: #007bff; text-align: center; margin-bottom: 20px; }
-        #scanButton { padding: 15px 30px; font-size: 1.2em; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 8px; transition: background-color 0.3s; width: 100%; box-sizing: border-box; }
-        #scanButton:hover { background-color: #0056b3; }
-        #status { margin-top: 20px; padding: 15px; border: 2px solid #ccc; border-radius: 8px; font-weight: bold; text-align: center; transition: border-color 0.3s; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f4f4f9; color: #333; }
         
-        .manual-input-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px dashed #ced4da;
-            border-radius: 8px;
-            background-color: #f0f8ff;
-        }
-        #manualNameInput {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1em;
-        }
-        #manualPunchButton {
-            padding: 10px 15px;
-            background-color: #ffc107;
-            color: black;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        #manualPunchButton:hover { background-color: #e0a800; }
+        /* --- Layout Principal --- */
+        .container { max-width: 800px; margin: 40px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); position: relative; }
         
-        .action-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        .action-buttons button { flex: 1; padding: 10px; border-radius: 5px; cursor: pointer; border: none; font-weight: bold; }
-        #exportButton { background-color: #28a745; color: white; }
-        #exportButton:hover { background-color: #1e7e34; }
-        #log { margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; max-height: 250px; overflow-y: auto; border: 1px solid #dee2e6; }
-        .log-entry { border-bottom: 1px dashed #ced4da; padding: 8px 0; }
-        .warning { color: #dc3545; font-size: 0.9em; margin-top: 15px; text-align: center; }
+        /* --- Cabeçalhos e Textos --- */
+        h1 { color: #007bff; text-align: center; margin-bottom: 10px; }
+        h2 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        p { text-align: center; color: #666; }
 
-        .admin-footer-action {
-            max-width: 700px;
-            margin: 50px auto 20px auto; 
-            padding-top: 20px;
-            border-top: 1px dashed #dee2e6;
-            text-align: center;
+        /* --- Botões Principais --- */
+        button { cursor: pointer; font-size: 1em; transition: all 0.2s; }
+        #scanButton { padding: 20px; font-size: 1.3em; background-color: #007bff; color: white; border: none; border-radius: 10px; width: 100%; font-weight: bold; box-shadow: 0 4px 6px rgba(0,123,255,0.2); }
+        #scanButton:active { transform: scale(0.98); }
+        
+        #status { margin-top: 20px; padding: 15px; border: 2px solid #e9ecef; border-radius: 8px; font-weight: bold; text-align: center; background: #f8f9fa; }
+        
+        /* --- Input Manual --- */
+        .manual-input-group { display: flex; gap: 10px; margin-top: 20px; padding: 15px; border: 1px dashed #ced4da; border-radius: 8px; background-color: #f0f8ff; }
+        #manualNameInput { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        #manualPunchButton { padding: 10px 20px; background-color: #ffc107; border: none; border-radius: 5px; font-weight: bold; }
+        
+        /* --- Logs e Ações --- */
+        .action-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .action-buttons button { flex: 1; padding: 12px; border-radius: 5px; border: none; font-weight: bold; color: white; }
+        .btn-blue { background-color: #17a2b8; }
+        .btn-green { background-color: #28a745; }
+        
+        #log { margin-top: 15px; padding: 10px; background-color: #e9ecef; border-radius: 5px; max-height: 200px; overflow-y: auto; border: 1px solid #dee2e6; font-size: 0.9em; }
+        .log-entry { border-bottom: 1px solid #ddd; padding: 5px 0; }
+
+        /* --- Botão Admin Flutuante --- */
+        #adminAccessBtn {
+            position: absolute; top: 20px; right: 20px;
+            background: none; border: 1px solid #ccc; padding: 5px 10px;
+            border-radius: 20px; font-size: 0.8em; color: #999; cursor: pointer;
         }
-        #clearButton {
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            border: 2px solid #dc3545; 
-            font-weight: bold;
-            background-color: #f8d7da; 
-            color: #721c24; 
-            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
-            font-size: 0.9em;
+        #adminAccessBtn:hover { background: #eee; color: #333; border-color: #999; }
+
+        /* =========================================
+           PAINEL ADMINISTRATIVO (Estilos)
+           ========================================= */
+        #adminPanel { display: none; } /* Oculto por padrão */
+        
+        .admin-header { display: flex; justify-content: space-between; align-items: center; background: #343a40; color: white; padding: 15px; border-radius: 8px 8px 0 0; margin: -30px -30px 20px -30px; }
+        .admin-header h2 { color: white; margin: 0; border: none; padding: 0; font-size: 1.2em; }
+        .btn-close-admin { background: #dc3545; color: white; border: none; padding: 5px 15px; border-radius: 4px; font-size: 0.9em; }
+
+        .filters { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #ddd; }
+        .filters label { display: block; font-size: 0.8em; font-weight: bold; margin-bottom: 5px; color: #555; }
+        .filters select, .filters input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+
+        /* Barra de Exportação Admin */
+        .admin-actions-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
         }
-        #clearButton:hover {
-            background-color: #dc3545;
+        #btnAdminExport {
+            background-color: #217346; /* Cor Excel */
             color: white;
-            border-color: #dc3545;
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: none;
+            font-size: 0.9em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
+        #btnAdminExport:hover { background-color: #1e6b41; }
+
+        .report-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .report-table th { background-color: #007bff; color: white; }
+        .report-table tr:nth-child(even) { background-color: #f2f2f2; }
+
+        .admin-footer { margin-top: 30px; padding-top: 20px; border-top: 2px dashed #dc3545; text-align: center; }
+        #clearButton { background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; font-weight: bold; }
+        #clearButton:hover { background-color: #c82333; }
+
+        /* --- Modal de Senha --- */
+        #passwordModal {
+            display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center;
+        }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; text-align: center; width: 300px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-content input { width: 80%; padding: 10px; margin: 15px 0; font-size: 1.2em; text-align: center; letter-spacing: 5px; }
+        
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🕒 Registro de Ponto NFC MR01</h1>
+
+    <div class="container" id="mainView">
+        <button id="adminAccessBtn" onclick="openPasswordModal()">🔒 Admin</button>
+
+        <h1>🕒 Registro de Ponto NFC</h1>
         
-        <p>Clique abaixo, **aproxime o crachá** e o ponto será registrado neste dispositivo.</p>
+        <p>Aproxime o crachá ou use o registro manual.</p>
         
-        <button id="scanButton">Iniciar Leitura NFC</button>
+        <button id="scanButton">📡 Iniciar Leitura NFC</button>
         
         <div id="status">Aguardando...</div>
         
-        <h2>Registro Manual (Caso de Esquecimento)</h2>
         <div class="manual-input-group">
-            <input type="text" id="manualNameInput" placeholder="Digite seu Nome Completo (Exatamente como cadastrado)">
+            <input type="text" id="manualNameInput" placeholder="Nome Completo (Conforme cadastro)">
             <button id="manualPunchButton" onclick="manualPunch()">Ponto Manual ✍️</button>
         </div>
-        <div class="action-buttons">
-            <button onclick="displayLocalPunches()">Atualizar Log Local</button>
-            <button id="exportButton" onclick="exportPunchesToCSV()">⬇️ Exportar Pontos (CSV)</button>
-        </div>
 
-        <h2>Log de Pontos (Últimos Registros)</h2>
+        <h2>Últimos Registros (Visualização Rápida)</h2>
         <div id="log">Nenhum registro ainda.</div>
         
-        <p class="warning">⚠️ Os dados são salvos apenas neste dispositivo. **Exporte o CSV** regularmente para não perder os registros.</p>
+        <div class="action-buttons">
+            <button class="btn-blue" onclick="displayLocalPunches()">🔄 Atualizar Log</button>
+            </div>
+        
+        <p style="font-size: 0.8em; margin-top: 20px; color: #888;">⚠️ Dados salvos localmente. Acesse o Admin para relatórios.</p>
     </div>
 
-    <div class="admin-footer-action">
-        <button id="clearButton" onclick="clearPunches()">⚠️ Limpeza Administrativa de Pontos (CUIDADO)</button>
+    <div class="container" id="adminPanel">
+        <div class="admin-header">
+            <h2>🛡️ Painel Administrativo</h2>
+            <button class="btn-close-admin" onclick="logoutAdmin()">Sair</button>
+        </div>
+
+        <div class="filters">
+            <div>
+                <label>📅 Período:</label>
+                <select id="filterPeriod" onchange="renderAdminReport()">
+                    <option value="today">Hoje</option>
+                    <option value="week">Esta Semana (7 dias)</option>
+                    <option value="month">Este Mês</option>
+                    <option value="all">Todos os Registros</option>
+                </select>
+            </div>
+            <div>
+                <label>👤 Funcionário:</label>
+                <select id="filterEmployee" onchange="renderAdminReport()">
+                    <option value="all">Todos</option>
+                    </select>
+            </div>
+            <div>
+                <label>🔍 Ação:</label>
+                <button onclick="renderAdminReport()" style="width: 100%; padding: 6px; background: #6c757d; color: white; border: none; border-radius: 4px;">Atualizar Lista</button>
+            </div>
+        </div>
+
+        <div class="admin-actions-bar">
+            <button id="btnAdminExport" onclick="exportFilteredReport()">
+                📊 Baixar Relatório (Excel/CSV)
+            </button>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Hora</th>
+                        <th>Funcionário</th>
+                        <th>ID Crachá</th>
+                    </tr>
+                </thead>
+                <tbody id="adminTableBody">
+                    </tbody>
+            </table>
+            <p id="recordCount" style="text-align: right; font-weight: bold; margin-top: 5px;">0 registros encontrados.</p>
+        </div>
+
+        <div class="admin-footer">
+            <h3>⚠️ Zona de Perigo</h3>
+            <p>Esta ação apaga todos os dados deste dispositivo permanentemente.</p>
+            <button id="clearButton" onclick="clearPunches()">🗑️ Limpeza Administrativa (CUIDADO)</button>
+        </div>
     </div>
+
+    <div id="passwordModal">
+        <div class="modal-content">
+            <h3>Acesso Restrito</h3>
+            <p>Digite a senha de administrador:</p>
+            <input type="password" id="adminPasswordInput" placeholder="****" maxlength="4">
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="checkPassword()" class="btn-green">Entrar</button>
+                <button onclick="closePasswordModal()" style="background: #ccc; border: none; padding: 10px; border-radius: 5px;">Cancelar</button>
+            </div>
+            <p id="passwordError" style="color: red; display: none; margin-top: 10px;">Senha incorreta!</p>
+        </div>
+    </div>
+
     <script>
         // =======================================================
-        // 🚀 INÍCIO DO WAKE LOCK API (Bloqueio de Tela) 🚀
+        // 🛠️ CONFIGURAÇÕES E DADOS
         // =======================================================
-        let wakeLock = null;
+        const ADMIN_PASSWORD = "1234";
 
-        /**
-         * Tenta solicitar o bloqueio da tela.
-         * Deve ser chamada após uma interação do usuário.
-         */
-        const requestWakeLock = async () => {
-            if (wakeLock !== null) return; // Já está ativo
-            if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('✅ Screen Wake Lock Ativo! Tela não apagará.');
-
-                    // Adiciona um listener para reativar o bloqueio se for liberado automaticamente
-                    wakeLock.addEventListener('release', () => {
-                        console.log('Bloqueio de tela liberado pelo sistema.');
-                        wakeLock = null; // Zera a referência
-                    });
-                } catch (err) {
-                    console.error(`❌ Erro ao solicitar Wake Lock: ${err.name}, ${err.message}`);
-                    wakeLock = null; // Garante que a referência está nula em caso de falha
-                }
-            } else {
-                console.log('❌ O navegador não suporta a Screen Wake Lock API.');
-            }
-        };
-
-        /**
-         * Tenta liberar o bloqueio da tela.
-         */
-        const releaseWakeLock = async () => {
-            if (wakeLock !== null) {
-                await wakeLock.release();
-                wakeLock = null;
-                console.log('Bloqueio de tela liberado manualmente.');
-            }
-        };
-
-        /**
-         * Lida com a visibilidade da página para tentar reativar o bloqueio ao voltar
-         */
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                requestWakeLock();
-            } else {
-                // Ao ir para segundo plano, o navegador pode liberar o lock.
-                // Não é estritamente necessário liberar manualmente aqui.
-            }
-        };
-
-        // Adiciona o listener de visibilidade para reativar o lock quando o usuário volta para a aba
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        // =======================================================
-        // 🛑 FIM DO WAKE LOCK API 🛑
-        // =======================================================
-
-        // Inicializa o contexto de áudio apenas uma vez
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = AudioContext ? new AudioContext() : null;
-        
-        // =======================================================
-        // 🚨 1. LISTA DE IDS NFC VÁLIDOS E NOMES ASSOCIADOS 🚨
         const COLLABORATOR_MAP = {
             '74:e6:dd:f0': 'GUSTAVO (TESTE)', 
             'a1:43:4a:6a': 'Hugo',
@@ -180,14 +214,170 @@
             'ID_CRACHA_07': 'Rafael Costa',
             'ID_CRACHA_08': 'Bianca Almeida',
             'ID_CRACHA_09': 'Felipe Rocha'
-            // Adicione aqui todos os IDs e Nomes válidos!
         };
         const VALID_NFC_IDS = Object.keys(COLLABORATOR_MAP);
+
+        let wakeLock = null;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = AudioContext ? new AudioContext() : null;
+
+        // =======================================================
+        // 🔐 LÓGICA DO ADMINISTADOR
+        // =======================================================
+        
+        function openPasswordModal() {
+            document.getElementById('passwordModal').style.display = 'flex';
+            document.getElementById('adminPasswordInput').value = '';
+            document.getElementById('passwordError').style.display = 'none';
+            document.getElementById('adminPasswordInput').focus();
+        }
+
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+        }
+
+        function checkPassword() {
+            const input = document.getElementById('adminPasswordInput').value;
+            if (input === ADMIN_PASSWORD) {
+                closePasswordModal();
+                showAdminPanel();
+            } else {
+                document.getElementById('passwordError').style.display = 'block';
+                playErrorSound();
+            }
+        }
+
+        function showAdminPanel() {
+            document.getElementById('mainView').classList.add('hidden');
+            document.getElementById('adminPanel').style.display = 'block';
+            populateEmployeeFilter();
+            renderAdminReport(); 
+        }
+
+        function logoutAdmin() {
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('mainView').classList.remove('hidden');
+        }
+
+        function populateEmployeeFilter() {
+            const select = document.getElementById('filterEmployee');
+            select.innerHTML = '<option value="all">Todos</option>';
+            const names = Object.values(COLLABORATOR_MAP).sort();
+            names.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+        }
+
+        // Função auxiliar para filtrar dados (usada tanto na tela quanto na exportação)
+        function getFilteredRecords() {
+            const period = document.getElementById('filterPeriod').value;
+            const empFilter = document.getElementById('filterEmployee').value;
+            const records = JSON.parse(localStorage.getItem('pontosRegistrados') || '[]');
+            
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+            return records.filter(record => {
+                const recDate = new Date(record.timestamp);
+                
+                if (empFilter !== 'all' && record.nome !== empFilter) return false;
+
+                if (period === 'today') return recDate >= startOfDay;
+                else if (period === 'week') return recDate >= startOfWeek;
+                else if (period === 'month') return recDate >= startOfMonth;
+                
+                return true; 
+            }).reverse(); // Ordena do mais recente para o antigo
+        }
+
+        function renderAdminReport() {
+            const filteredRecords = getFilteredRecords();
+            const tableBody = document.getElementById('adminTableBody');
+            tableBody.innerHTML = '';
+
+            if (filteredRecords.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Nenhum registro encontrado para este filtro.</td></tr>';
+            } else {
+                filteredRecords.forEach(rec => {
+                    const dateObj = new Date(rec.timestamp);
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${dateObj.toLocaleDateString('pt-BR')}</td>
+                        <td>${dateObj.toLocaleTimeString('pt-BR')}</td>
+                        <td style="font-weight:bold;">${rec.nome}</td>
+                        <td style="color:#666; font-size:0.8em;">${rec.id}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+            document.getElementById('recordCount').textContent = `${filteredRecords.length} registros encontrados.`;
+        }
+
+        // --- NOVA FUNÇÃO DE EXPORTAÇÃO ADMIN (EXCEL) ---
+        function exportFilteredReport() {
+            const records = getFilteredRecords();
+
+            if (records.length === 0) {
+                alert("Não há dados na tabela atual para exportar.");
+                return;
+            }
+
+            // Cabeçalho CSV com ponto e vírgula (Padrão Excel Brasil)
+            const header = "Data;Hora;Nome_Colaborador;ID_Cracha\n";
+            
+            const csvRows = records.map(record => {
+                const dateObj = new Date(record.timestamp);
+                const dataStr = dateObj.toLocaleDateString('pt-BR');
+                const horaStr = dateObj.toLocaleTimeString('pt-BR');
+                const nomeSanitizado = record.nome.replace(/;/g, ','); // Evita quebra do CSV
+                
+                return `${dataStr};${horaStr};${nomeSanitizado};${record.id}`;
+            });
+
+            // Adiciona BOM (\uFEFF) para o Excel reconhecer acentos (UTF-8)
+            const csvContent = "\uFEFF" + header + csvRows.join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            // Nome do arquivo dinâmico
+            const periodo = document.getElementById('filterPeriod').value;
+            const funcionario = document.getElementById('filterEmployee').value;
+            const nomeArq = funcionario === 'all' ? 'Geral' : funcionario.replace(/\s+/g, '_');
+            
+            a.href = url;
+            a.download = `Relatorio_Ponto_${nomeArq}_${periodo}_${new Date().getTime()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // =======================================================
+        // ⚙️ FUNÇÕES ORIGINAIS (Sistema)
         // =======================================================
 
-        // Adiciona a chamada de Wake Lock ao botão principal
+        const requestWakeLock = async () => {
+            if (wakeLock !== null) return;
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } catch (err) { console.error(err); }
+            }
+        };
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') requestWakeLock();
+        });
+
         document.getElementById('scanButton').addEventListener('click', () => {
-            requestWakeLock(); // Tenta garantir que a tela não apague ao iniciar o NFC
+            requestWakeLock();
             startNFCScan();
         });
 
@@ -197,72 +387,40 @@
         
         function getIdByCollaboratorName(name) {
             const normalizedName = name.trim().toUpperCase();
-            
             for (const id in COLLABORATOR_MAP) {
-                if (COLLABORATOR_MAP[id].toUpperCase() === normalizedName) {
-                    return id;
-                }
+                if (COLLABORATOR_MAP[id].toUpperCase() === normalizedName) return id;
             }
             return null;
         }
-        
-        // --- FUNÇÃO PARA GERAR SOM DE SUCESSO (Bip agudo) ---
+
         function playSuccessSound() {
             if (!audioCtx) return;
-
             try {
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                oscillator.type = 'sine';
-                
-                // Tom alto para sucesso (880 Hz)
-                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); 
-                
-                // Volume e duração (0.1 segundo)
-                gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1); 
-
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.1);
-                
-            } catch (e) {
-                console.error("Erro ao gerar áudio de sucesso.", e);
-            }
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.connect(g); g.connect(audioCtx.destination);
+                o.type = 'sine';
+                o.frequency.setValueAtTime(880, audioCtx.currentTime);
+                g.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                o.start(); o.stop(audioCtx.currentTime + 0.1);
+            } catch (e) {}
         }
         
-        // --- FUNÇÃO PARA GERAR SOM DE ERRO (Tom grave e decrescente) ---
         function playErrorSound() {
             if (!audioCtx) return;
-            
             try {
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                
-                oscillator.type = 'triangle'; // Onda triangular
-                
-                // Frequência: começa em 440Hz e cai para 300Hz (tom de "falha")
-                oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); 
-                oscillator.frequency.linearRampToValueAtTime(300, audioCtx.currentTime + 0.2);
-                
-                // Volume e duração (0.2 segundos)
-                gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2); 
-
-                oscillator.start();
-                oscillator.stop(audioCtx.currentTime + 0.2);
-            } catch (e) {
-                console.error("Erro ao gerar áudio de erro.", e);
-            }
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.connect(g); g.connect(audioCtx.destination);
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(440, audioCtx.currentTime);
+                o.frequency.linearRampToValueAtTime(300, audioCtx.currentTime + 0.2);
+                g.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                o.start(); o.stop(audioCtx.currentTime + 0.2);
+            } catch (e) {}
         }
-        // --- FIM FUNÇÕES DE ÁUDIO GERADO ---
-
 
         function logStatus(message, isError = false) {
             const statusElement = document.getElementById('status');
@@ -272,12 +430,11 @@
             
             const logElement = document.getElementById('log');
             const time = new Date().toLocaleTimeString('pt-BR');
-            const entry = document.createElement('p');
+            const entry = document.createElement('div');
             entry.className = 'log-entry';
-            entry.style.color = isError ? '#dc3545' : 'black';
-            entry.innerHTML = `**[${time}]** ${message}`;
+            entry.innerHTML = `<strong>${time}</strong> - ${message}`;
             logElement.prepend(entry);
-            if (logElement.children.length > 10) logElement.removeChild(logElement.lastElementChild);
+            if (logElement.children.length > 5) logElement.removeChild(logElement.lastElementChild);
         }
         
         function savePunchLocally(colaboradorId) {
@@ -294,151 +451,84 @@
             records.push(record);
             localStorage.setItem('pontosRegistrados', JSON.stringify(records));
             
-            // SUCESSO DE PONTO
             playSuccessSound();
-
-            logStatus(`✅ Ponto registrado localmente! ${record.nome} (${colaboradorId})`);
+            logStatus(`✅ Ponto registrado! ${record.nome}`);
             displayLocalPunches();
         }
 
         function manualPunch() {
             const inputElement = document.getElementById('manualNameInput');
-            const colaboradorNome = inputElement.value.trim();
+            const nome = inputElement.value.trim();
+            if (!nome) { logStatus("Digite seu nome.", true); playErrorSound(); return; }
             
-            if (!colaboradorNome) {
-                logStatus("🛑 Por favor, digite seu nome completo.", true);
-                playErrorSound(); // ERRO
-                return;
-            }
-
-            const colaboradorId = getIdByCollaboratorName(colaboradorNome);
-
-            if (colaboradorId) {
-                // Sucesso: Chama savePunchLocally, que toca o áudio de sucesso.
-                savePunchLocally(colaboradorId);
+            const id = getIdByCollaboratorName(nome);
+            if (id) {
+                savePunchLocally(id);
                 inputElement.value = '';
             } else {
-                logStatus(`🛑 Nome '${colaboradorNome}' não reconhecido. Por favor, digite exatamente como está cadastrado.`, true);
-                playErrorSound(); // ERRO
+                logStatus(`Nome '${nome}' não encontrado.`, true);
+                playErrorSound();
             }
         }
 
         async function startNFCScan() {
-            logStatus("Iniciando leitura... Aproxime o crachá.");
-            
+            logStatus("Aproxime o crachá...");
             if ('NDEFReader' in window) {
                 try {
                     const ndef = new NDEFReader();
                     await ndef.scan();
-                    logStatus("Leitura iniciada. Aguardando crachá (Tag NDEF)...");
-
                     ndef.onreading = (event) => {
-                        let colaboradorNFC_ID = event.serialNumber || 'SEM_SERIAL'; 
-                        
+                        let id = event.serialNumber || 'SEM_SERIAL';
                         const records = event.message.records;
                         if (records.length > 0) {
                             const textRecord = records.find(r => r.recordType === 'text');
                             if (textRecord) {
-                                const decoder = new TextDecoder(textRecord.encoding);
-                                colaboradorNFC_ID = decoder.decode(textRecord.data);
+                                id = new TextDecoder(textRecord.encoding).decode(textRecord.data);
                             }
                         }
-
-                        if (VALID_NFC_IDS.includes(colaboradorNFC_ID)) {
-                            // Sucesso: Chama savePunchLocally, que toca o áudio de sucesso.
-                            savePunchLocally(colaboradorNFC_ID);
+                        if (VALID_NFC_IDS.includes(id)) {
+                            savePunchLocally(id);
                         } else {
-                            // Falha: Toca som de erro e registra status
                             playErrorSound();
-                            logStatus(`🛑 Crachá não reconhecido! ID lido: ${colaboradorNFC_ID}. Anote e adicione no código.`, true);
+                            logStatus(`Crachá desconhecido: ${id}`, true);
                         }
                     };
-
-                    ndef.onreadingerror = (error) => {
-                        playErrorSound(); // ERRO
-                        logStatus("Erro ao ler o crachá. Tente novamente ou verifique o tipo de tag.", true);
-                    };
-
-                } catch (error) {
-                    playErrorSound(); // ERRO
-                    logStatus(`Erro ao iniciar o scanner: ${error.name}. Verifique a permissão NFC e se o Chrome/Android está em uso.`, true);
-                }
+                    ndef.onreadingerror = () => { playErrorSound(); logStatus("Erro leitura.", true); };
+                } catch (error) { playErrorSound(); logStatus(`Erro scanner: ${error.name}`, true); }
             } else {
-                logStatus("❌ Web NFC API não é suportada neste navegador.", true);
+                logStatus("NFC não suportado neste navegador.", true);
             }
         }
         
         function displayLocalPunches() {
             const logElement = document.getElementById('log');
-            const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
-            const records = JSON.parse(existingRecordsJSON);
-            
+            const records = JSON.parse(localStorage.getItem('pontosRegistrados') || '[]');
             logElement.innerHTML = ''; 
+            if (records.length === 0) { logElement.innerHTML = '<p>Vazio.</p>'; return; }
             
-            if (records.length === 0) {
-                logElement.innerHTML = '<p>Nenhum ponto salvo localmente ainda.</p>';
-                return;
-            }
-            
-            records.reverse().forEach(record => {
-                const entry = document.createElement('p');
+            records.slice(-5).reverse().forEach(record => {
+                const entry = document.createElement('div');
                 entry.className = 'log-entry';
-                entry.style.color = 'black';
-                entry.innerHTML = `**[${record.horaLocal}]** - ${record.nome} (${record.id})`;
+                entry.innerHTML = `<strong>${record.horaLocal.split(' ')[1]}</strong> - ${record.nome}`;
                 logElement.appendChild(entry);
             });
         }
         
         function clearPunches() {
-            if (confirm("ATENÇÃO: Você tem certeza que deseja limpar TODOS os registros de ponto salvos NESTE dispositivo? ESTA AÇÃO É IRREVERSÍVEL. Certifique-se de ter exportado o CSV antes.")) {
+            if (confirm("🚨 TEM CERTEZA? Isso apagará TODOS os registros deste dispositivo para sempre.")) {
                 localStorage.removeItem('pontosRegistrados');
-                logStatus("🗑️ Todos os pontos foram removidos do dispositivo.", true);
+                alert("Dados apagados com sucesso.");
+                renderAdminReport();
                 displayLocalPunches();
-            } else {
-                logStatus("❌ Limpeza cancelada.");
             }
         }
         
-        function exportPunchesToCSV() {
-            const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
-            const records = JSON.parse(existingRecordsJSON);
-
-            if (records.length === 0) {
-                alert("Não há pontos registrados para exportar.");
-                return;
-            }
-
-            const header = "ID_Cracha;Nome_Colaborador;Data_Completa_ISO;Hora_Local\n";
-            
-            const csvRows = records.map(record => {
-                const sanitizedName = record.nome.replace(/;/g, ','); 
-                return `${record.id};${sanitizedName};${record.timestamp};${record.horaLocal}`;
-            });
-
-            const csvContent = header + csvRows.join('\n');
-
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            
-            a.setAttribute('href', url);
-            
-            const now = new Date();
-            const filename = `relatorio_ponto_${now.getFullYear()}${now.getMonth()+1}${now.getDate()}_${now.getHours()}${now.getMinutes()}.csv`;
-            
-            a.setAttribute('download', filename);
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            logStatus(`🎉 Exportação concluída! Arquivo ${filename} baixado.`);
-        }
-        
-        // Inicializações
         document.addEventListener('DOMContentLoaded', () => {
              displayLocalPunches();
-             requestWakeLock(); // Tenta ativar o Wake Lock assim que a página carrega
+             requestWakeLock();
+             document.getElementById('adminPasswordInput').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') checkPassword();
+            });
         });
     </script>
 </body>
