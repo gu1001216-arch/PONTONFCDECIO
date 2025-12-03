@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Ponto NFC + Admin</title>
+    <title>Registro de Ponto NFC + Admin (REMOTO)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f4f4f9; color: #333; }
         
@@ -104,7 +104,7 @@
     <div class="container" id="mainView">
         <button id="adminAccessBtn" onclick="openPasswordModal()">🔒 Admin</button>
 
-        <h1>🕒 Registro de Ponto NFC</h1>
+        <h1>🕒 Registro de Ponto NFC (Leitura Remota)</h1>
         
         <p>Aproxime o crachá ou use o registro manual.</p>
         
@@ -117,14 +117,17 @@
             <button id="manualPunchButton" onclick="manualPunch()">Ponto Manual ✍️</button>
         </div>
 
-        <h2>Últimos Registros (Visualização Rápida)</h2>
-        <div id="log">Nenhum registro ainda.</div>
+        <h2>Últimos Registros (Visualização Remota)</h2>
+        <div id="log">Carregando registros...</div>
         
         <div class="action-buttons">
-            <button class="btn-blue" onclick="displayLocalPunches()">🔄 Atualizar Log</button>
+            <button class="btn-blue" onclick="displayRemotePunches()">🔄 Atualizar Log (Busca Remota)</button>
             </div>
         
-        <p style="font-size: 0.8em; margin-top: 20px; color: #888;">⚠️ Dados salvos localmente. Acesse o Admin para relatórios.</p>
+        <p style="font-size: 0.8em; margin-top: 20px; color: #dc3545; font-weight: bold;">
+            ⚠️ ATENÇÃO: Os dados estão sendo lidos de um arquivo centralizado, mas o registro de ponto (escrita) AINDA É LOCAL.
+            Você deve integrar um Backend (Firebase/Supabase) para centralizar os registros.
+        </p>
     </div>
 
     <div class="container" id="adminPanel">
@@ -157,7 +160,7 @@
 
         <div class="admin-actions-bar">
             <button id="btnAdminExport" onclick="exportFilteredReport()">
-                📊 Baixar Relatório (Excel/CSV)
+                📊 Baixar Relatório (CSV)
             </button>
         </div>
 
@@ -172,6 +175,7 @@
                     </tr>
                 </thead>
                 <tbody id="adminTableBody">
+                    <tr><td colspan="4" style="text-align:center;">Carregando dados remotos...</td></tr>
                     </tbody>
             </table>
             <p id="recordCount" style="text-align: right; font-weight: bold; margin-top: 5px;">0 registros encontrados.</p>
@@ -179,8 +183,8 @@
 
         <div class="admin-footer">
             <h3>⚠️ Zona de Perigo</h3>
-            <p>Esta ação apaga todos os dados deste dispositivo permanentemente.</p>
-            <button id="clearButton" onclick="clearPunches()">🗑️ Limpeza Administrativa (CUIDADO)</button>
+            <p style="color: red; font-weight: bold;">Atenção: Esta ação APENAS limpa o cache local. Se você estiver usando um Backend, os dados centralizados permanecem.</p>
+            <button id="clearButton" onclick="clearPunches()">🗑️ Limpeza de CACHE LOCAL</button>
         </div>
     </div>
 
@@ -199,9 +203,11 @@
 
     <script>
         // =======================================================
-        // 🛠️ CONFIGURAÇÕES E DADOS
+        // 🛠️ CONFIGURAÇÕES E DADOS (AGORA REMOTOS)
         // =======================================================
         const ADMIN_PASSWORD = "1234";
+        // URL PARA O ARQUIVO JSON NO SEU GITHUB PAGES (APENAS PARA LEITURA)
+        const PUNCHES_DATA_URL = 'pontos.json'; 
 
         const COLLABORATOR_MAP = {
             '74:e6:dd:f0': 'GUSTAVO (TESTE)', 
@@ -220,6 +226,29 @@
         let wakeLock = null;
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioCtx = AudioContext ? new AudioContext() : null;
+
+        /**
+         * Busca a lista de pontos registrados do arquivo JSON no GitHub Pages (Backend de Leitura).
+         * @returns {Promise<Array>} Uma Promise que resolve para a lista de registros.
+         */
+        async function fetchRemotePunches() {
+            try {
+                // Tenta buscar os dados do arquivo JSON no repositório.
+                const response = await fetch(PUNCHES_DATA_URL);
+                if (!response.ok) {
+                    console.error('Erro ao buscar dados remotos:', response.statusText);
+                    logStatus(`⚠️ Falha ao buscar dados remotos (${response.statusText}). Usando dados locais temporariamente (pode estar desatualizado).`, true);
+                    // Em caso de falha, tenta o localStorage como fallback
+                    return JSON.parse(localStorage.getItem('pontosRegistrados') || '[]');
+                }
+                const records = await response.json();
+                return records;
+            } catch (error) {
+                console.error("Erro de rede ao buscar o arquivo JSON:", error);
+                logStatus(`❌ Erro de rede. Dados não puderam ser carregados.`, true);
+                return [];
+            }
+        }
 
         // =======================================================
         // 🔐 LÓGICA DO ADMINISTADOR
@@ -272,10 +301,11 @@
         }
 
         // Função auxiliar para filtrar dados (usada tanto na tela quanto na exportação)
-        function getFilteredRecords() {
+        async function getFilteredRecords() { // Adicionado async
             const period = document.getElementById('filterPeriod').value;
             const empFilter = document.getElementById('filterEmployee').value;
-            const records = JSON.parse(localStorage.getItem('pontosRegistrados') || '[]');
+            // *** MUDANÇA CRÍTICA: LÊ DO ARQUIVO REMOTO (JSON) ***
+            const records = await fetchRemotePunches(); // Usando a nova função
             
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -295,8 +325,8 @@
             }).reverse(); // Ordena do mais recente para o antigo
         }
 
-        function renderAdminReport() {
-            const filteredRecords = getFilteredRecords();
+        async function renderAdminReport() { // Adicionado async
+            const filteredRecords = await getFilteredRecords(); // Adicionado await
             const tableBody = document.getElementById('adminTableBody');
             tableBody.innerHTML = '';
 
@@ -318,9 +348,9 @@
             document.getElementById('recordCount').textContent = `${filteredRecords.length} registros encontrados.`;
         }
 
-        // --- NOVA FUNÇÃO DE EXPORTAÇÃO ADMIN (EXCEL) ---
-        function exportFilteredReport() {
-            const records = getFilteredRecords();
+        // --- NOVA FUNÇÃO DE EXPORTAÇÃO ADMIN (CSV) ---
+        async function exportFilteredReport() { // Adicionado async
+            const records = await getFilteredRecords(); // Adicionado await
 
             if (records.length === 0) {
                 alert("Não há dados na tabela atual para exportar.");
@@ -359,7 +389,7 @@
         }
 
         // =======================================================
-        // ⚙️ FUNÇÕES ORIGINAIS (Sistema)
+        // ⚙️ FUNÇÕES DE REGISTRO (Sistema)
         // =======================================================
 
         const requestWakeLock = async () => {
@@ -437,23 +467,30 @@
             if (logElement.children.length > 5) logElement.removeChild(logElement.lastElementChild);
         }
         
-        function savePunchLocally(colaboradorId) {
+        // 🚨 FUNÇÃO DE REGISTRO - ATENÇÃO 🚨
+        // Esta função apenas salva no localStorage (cache local) e DEVE ser trocada
+        // pela chamada à API do seu Backend (Firebase/Supabase) para centralizar os dados.
+        function savePunchLocallyAndWarn(colaboradorId) {
             const now = new Date();
             const record = {
                 id: colaboradorId,
                 nome: getCollaboratorName(colaboradorId),
                 timestamp: now.toISOString(),
-                horaLocal: now.toLocaleString('pt-BR')
+                // Adicione outros campos necessários para o seu Backend
+                horaLocal: now.toLocaleString('pt-BR') 
             };
 
+            // *** CÓDIGO TEMPORÁRIO DE CACHE LOCAL ***
             const existingRecordsJSON = localStorage.getItem('pontosRegistrados') || '[]';
             let records = JSON.parse(existingRecordsJSON);
             records.push(record);
-            localStorage.setItem('pontosRegistrados', JSON.stringify(records));
+            localStorage.setItem('pontosRegistrados', JSON.stringify(records)); 
+            // ***************************************
             
             playSuccessSound();
-            logStatus(`✅ Ponto registrado! ${record.nome}`);
-            displayLocalPunches();
+            logStatus(`✅ Ponto registrado LOCALMENTE (FALTA BACKEND)! ${record.nome}`);
+            // Chamada de atualização deve ser para a função remota
+            displayRemotePunches();
         }
 
         function manualPunch() {
@@ -463,7 +500,7 @@
             
             const id = getIdByCollaboratorName(nome);
             if (id) {
-                savePunchLocally(id);
+                savePunchLocallyAndWarn(id);
                 inputElement.value = '';
             } else {
                 logStatus(`Nome '${nome}' não encontrado.`, true);
@@ -487,7 +524,7 @@
                             }
                         }
                         if (VALID_NFC_IDS.includes(id)) {
-                            savePunchLocally(id);
+                            savePunchLocallyAndWarn(id); // USANDO FUNÇÃO COM AVISO DE BACKEND
                         } else {
                             playErrorSound();
                             logStatus(`Crachá desconhecido: ${id}`, true);
@@ -500,31 +537,37 @@
             }
         }
         
-        function displayLocalPunches() {
+        // Função para carregar e exibir os últimos 5 pontos.
+        async function displayRemotePunches() { // Alterada para async
             const logElement = document.getElementById('log');
-            const records = JSON.parse(localStorage.getItem('pontosRegistrados') || '[]');
-            logElement.innerHTML = ''; 
-            if (records.length === 0) { logElement.innerHTML = '<p>Vazio.</p>'; return; }
+            // *** MUDANÇA CRÍTICA: LÊ DO ARQUIVO REMOTO (JSON) ***
+            const records = await fetchRemotePunches(); // Usando a nova função
             
-            records.slice(-5).reverse().forEach(record => {
+            logElement.innerHTML = ''; 
+            if (records.length === 0) { logElement.innerHTML = '<p>Vazio (Remoto). Tente o botão Atualizar.</p>'; return; }
+            
+            // Exibe os últimos 5 registros, ordenados do mais novo para o antigo.
+            // É importante que o JSON tenha o campo 'timestamp'
+            records.slice().reverse().slice(0, 5).forEach(record => {
                 const entry = document.createElement('div');
                 entry.className = 'log-entry';
-                entry.innerHTML = `<strong>${record.horaLocal.split(' ')[1]}</strong> - ${record.nome}`;
+                const time = new Date(record.timestamp).toLocaleTimeString('pt-BR');
+                entry.innerHTML = `<strong>${time}</strong> - ${record.nome}`;
                 logElement.appendChild(entry);
             });
         }
         
         function clearPunches() {
-            if (confirm("🚨 TEM CERTEZA? Isso apagará TODOS os registros deste dispositivo para sempre.")) {
+            if (confirm("🚨 ATENÇÃO: A limpeza de dados remotos (banco de dados real) não pode ser feita por aqui. Esta função apenas limpa o cache LOCAL.")) {
                 localStorage.removeItem('pontosRegistrados');
-                alert("Dados apagados com sucesso.");
+                alert("Cache Local apagado. Os dados centralizados (JSON/Banco de Dados) permanecem intactos.");
                 renderAdminReport();
-                displayLocalPunches();
+                displayRemotePunches();
             }
         }
         
         document.addEventListener('DOMContentLoaded', () => {
-             displayLocalPunches();
+             displayRemotePunches(); // Chamada atualizada
              requestWakeLock();
              document.getElementById('adminPasswordInput').addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') checkPassword();
