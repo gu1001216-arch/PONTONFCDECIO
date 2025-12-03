@@ -1,1 +1,14 @@
-
+[
+  {
+    "id": "74:e6:dd:f0",
+    "nome": "GUSTAVO (TESTE)",
+    "timestamp": "2025-11-20T10:00:00.000Z",
+    "horaLocal": "07:00:00"
+  },
+  {
+    "id": "a1:43:4a:6a",
+    "nome": "Hugo",
+    "timestamp": "2025-11-20T12:30:00.000Z",
+    "horaLocal": "09:30:00"
+  }
+]
