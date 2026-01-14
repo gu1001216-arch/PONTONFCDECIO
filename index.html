@@ -589,29 +589,27 @@
             return null;
         }
 
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                // Cancela qualquer fala em andamento para evitar sobreposição
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pt-BR';
+                utterance.rate = 1.0; // Velocidade normal
+                utterance.pitch = 1.0; // Tom normal
+                utterance.volume = 1.0; // Volume máximo (0 a 1)
+                
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
         function playSuccessSound() {
-            if (!audioCtx) return;
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.connect(g); g.connect(audioCtx.destination);
-            o.type = 'sine';
-            o.frequency.setValueAtTime(880, audioCtx.currentTime);
-            g.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-            o.start(); o.stop(audioCtx.currentTime + 0.1);
+            speak("PONTO REGISTRADO");
         }
         
-        function playErrorSound() {
-            if (!audioCtx) return;
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.connect(g); g.connect(audioCtx.destination);
-            o.type = 'triangle';
-            o.frequency.setValueAtTime(440, audioCtx.currentTime);
-            o.frequency.linearRampToValueAtTime(300, audioCtx.currentTime + 0.2);
-            g.gain.setValueAtTime(0.5, audioCtx.currentTime);
-            g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-            o.start(); o.stop(audioCtx.currentTime + 0.2);
+        function playErrorSound(customMessage) {
+            speak(customMessage || "CRACHÁ NÃO CADASTRADO");
         }
 
         function logStatus(message, type = 'info') {
@@ -657,7 +655,7 @@
             const nome = selectElement.value;
             if (!nome) { 
                 logStatus("Por favor, selecione um nome.", 'error'); 
-                playErrorSound(); 
+                playErrorSound("SELECIONE UM NOME"); 
                 return; 
             }
             
@@ -694,8 +692,8 @@
                             playErrorSound();
                         }
                     };
-                    ndef.onreadingerror = () => { playErrorSound(); logStatus("Erro na leitura do NFC.", 'error'); };
-                } catch (error) { playErrorSound(); logStatus(`Erro no scanner: ${error.name}`, 'error'); }
+                    ndef.onreadingerror = () => { playErrorSound("ERRO NA LEITURA"); logStatus("Erro na leitura do NFC.", 'error'); };
+                } catch (error) { playErrorSound("ERRO NO SCANNER"); logStatus(`Erro no scanner: ${error.name}`, 'error'); }
             } else {
                 logStatus("NFC não suportado neste navegador.", 'error');
             }
@@ -735,6 +733,7 @@
              requestWakeLock();
              
              document.getElementById('scanButton').addEventListener('click', () => {
+                initAudio(); // Mantido para compatibilidade, embora a Web Speech API não dependa estritamente do AudioContext
                 requestWakeLock();
                 startNFCScan();
              });
